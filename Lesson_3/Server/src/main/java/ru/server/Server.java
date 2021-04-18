@@ -13,8 +13,11 @@ public class Server {
     public Server(int port) {
         this.port = port;
         this.clients = new ArrayList<>();
+        AutoService.connect();                                                                  // подключаем БД
         try (ServerSocket serverSocket = new ServerSocket(port)) {
             System.out.println("Сервер запущен на порту " + port);
+
+            //System.out.println("result from DB: " + AutoService.getNicknameByLoginAndPassword("login1", "pass1")); // подключаем БД
             while (true) {
                 System.out.println("Ждем нового клиента..");
                 Socket socket = serverSocket.accept();

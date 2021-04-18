@@ -68,7 +68,8 @@ public class Controller implements Initializable {
         }
 
         try {
-            out.writeUTF("/login " + usernameField.getText());
+            String str = usernameField.getText();
+            out.writeUTF(str);
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -76,19 +77,25 @@ public class Controller implements Initializable {
 
     public void connect() {
         try {
-            socket = new Socket("localhost", 8189);
+            socket = new Socket("localhost", 8289);
             in = new DataInputStream(socket.getInputStream());
             out = new DataOutputStream(socket.getOutputStream());
             Thread t = new Thread(() -> {
                 try {
+
+
                     // Цикл авторизации
                     while (true) {
                         String msg = in.readUTF();
-                        if (msg.startsWith("/login_ok ")) {
-                            setUsername(msg.split("\\s")[1]);
+                        if (msg.startsWith("/auth-OK ")) {
+                            System.out.println(msg.split(" ")[0]);
+                            String username = msg.split(" ")[1];
+                            System.out.println(msg.split(" ")[1]);
+                            setUsername(username);
+
                             break;
                         }
-                        if (msg.startsWith("/login_failed ")) {
+                        if (msg.startsWith("/login_failed")) {
                             String cause = msg.split("\\s", 2)[1];
                             msgArea.appendText(cause + "\n");
                         }

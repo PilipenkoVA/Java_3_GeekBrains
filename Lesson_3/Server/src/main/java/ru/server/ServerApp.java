@@ -2,6 +2,6 @@ package ru.server;
 
 public class ServerApp {
     public static void main(String[] args) {
-        new Server(8189);
+        new Server(8289);
     }
 }
