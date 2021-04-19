@@ -10,81 +10,95 @@ public class ClientHandler {
     private Socket socket;
     private DataInputStream in;
     private DataOutputStream out;
-    private String username;
+    private String nick;
 
-    public String getUsername() {
-        return username;
+    public String getNick() {
+        return nick;
     }
 
-    public ClientHandler(Server server, Socket socket) throws IOException {
-        this.server = server;
-        this.socket = socket;
-        this.in = new DataInputStream(socket.getInputStream());
-        this.out = new DataOutputStream(socket.getOutputStream());
+    public ClientHandler(Server server, Socket socket) {
+        try {
+            this.server = server;
+            this.socket = socket;
+            this.in = new DataInputStream(socket.getInputStream());
+            this.out = new DataOutputStream(socket.getOutputStream());
+            startWorkerThread();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void startWorkerThread() {
         new Thread(() -> {
             try {
-                while (true) { // Цикл авторизации
+                while (true) {
                     String msg = in.readUTF();
-                    if (msg.startsWith("/login ")) {
-                        // login Bob
-                        String usernameFromLogin = msg.split("\\s")[1];
-
-                        if (server.isUserOnline(usernameFromLogin)) {
-                            sendMessage("/login_failed Указанное имя уже используется");
-                            continue;
+                    if (msg.startsWith("/auth ")) {
+                        // /auth login1 pass1
+                        String[] tokens = msg.split(" ");
+                        String nick = server.getAuthHandler().getNickByLoginPass(tokens[1], tokens[2]);
+                        if (nick != null) {
+                            if (server.isNickBusy(nick)) {
+                                out.writeUTF("Учетная запись уже используется");
+                                continue;
+                            }
+                            out.writeUTF("/auth_OK " + nick);
+                            this.nick = nick;
+                            server.subscribe(this);
+                            break;
+                        } else {
+                            out.writeUTF("Неверный логин/пароль");
                         }
-
-                        username = usernameFromLogin;
-                        sendMessage("/login_ok " + username);
-                        server.subscribe(this);
-                        break;
                     }
                 }
-
-                while (true) { // Цикл общения с клиентом
+                while (true) {
                     String msg = in.readUTF();
                     if (msg.startsWith("/")) {
-                        executeCommand(msg);
-                        continue;
+                        if (msg.startsWith("/@ ")) {
+                            // /w nick2 hello hello
+                            String[] tokens = msg.split(" ", 3);
+                            server.sendPrivateMsg(this, tokens[1], tokens[2]);
+                        }
+                        if(msg.startsWith("/end")) {
+                            closeConnection();
+                        }
+                    } else {
+                        server.broadcastMsg(this, msg);
                     }
-                    server.broadcastMessage(username + ": " + msg);
+                    System.out.println(msg);
                 }
             } catch (IOException e) {
                 e.printStackTrace();
             } finally {
-                disconnect();
+                closeConnection();
             }
         }).start();
     }
 
-    private void executeCommand(String cmd) {
-        // /@ Bob Hello, Bob!!!
-        if (cmd.startsWith("/@ ")) {
-            String[] tokens = cmd.split("\\s", 3);
-            server.sendPrivateMessage(this, tokens[1], tokens[2]);
-            return;
-        }
-        if (cmd.equals("/end")){
-            disconnect();
-        }
-    }
-
-    public void sendMessage(String message) {
+    public void sendMessage(String msg) {
         try {
-            out.writeUTF(message);
+            out.writeUTF(msg);
         } catch (IOException e) {
-            disconnect();
+            e.printStackTrace();
         }
     }
 
-    public void disconnect() {
+    private void closeConnection() {
         server.unsubscribe(this);
-        if (socket != null) {
-            try {
-                socket.close();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+        try {
+            socket.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        try {
+            in.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        try {
+            out.close();
+        } catch (IOException e) {
+            e.printStackTrace();
         }
     }
 }
