@@ -1,150 +1,120 @@
 package ru.client;
 
 import javafx.application.Platform;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.control.*;
+import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.HBox;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
-import java.net.Socket;
 import java.net.URL;
 import java.util.ResourceBundle;
 
 public class Controller implements Initializable {
-    @FXML
-    TextField msgField, usernameField;
+    private boolean authorized;
+    private Network network;
+    private String nick;
+    private ObservableList<String> clientsList;
 
     @FXML
-    TextArea msgArea;
+    TextField msgField, loginField;
 
     @FXML
-    HBox loginPanel, msgPanel;
+    TextArea mainTextArea;
 
     @FXML
-    ListView<String> clientsList;
+    PasswordField passField;
 
-    private Socket socket;
-    private DataInputStream in;
-    private DataOutputStream out;
-    private String username;
+    @FXML
+    HBox authPanel, msgPanel;
 
-    public void setUsername(String username) {
-        this.username = username;
-        if (username != null) {
-            loginPanel.setVisible(false);
-            loginPanel.setManaged(false);
+    @FXML
+    ListView<String> clientsView;
+
+    public void setAuthorized(boolean authorized) {
+        this.authorized = authorized;
+        if (this.authorized) {
+            authPanel.setVisible(false);
+            authPanel.setManaged(false);
             msgPanel.setVisible(true);
             msgPanel.setManaged(true);
-            clientsList.setVisible(true);
-            clientsList.setManaged(true);
+            clientsView.setVisible(true);
+            clientsView.setManaged(true);
         } else {
-            loginPanel.setVisible(true);
-            loginPanel.setManaged(true);
+            authPanel.setVisible(true);
+            authPanel.setManaged(true);
             msgPanel.setVisible(false);
             msgPanel.setManaged(false);
-            clientsList.setVisible(false);
-            clientsList.setManaged(false);
+            clientsView.setVisible(false);
+            clientsView.setManaged(false);
+            nick = "";
         }
     }
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
-        setUsername(null);
-    }
-
-    public void login() {
-        if (socket == null || socket.isClosed()) {
-            connect();
-        }
-
-        if (usernameField.getText().isEmpty()) {
-            Alert alert = new Alert(Alert.AlertType.ERROR, "Имя пользователя не может быть пустым", ButtonType.OK);
-            alert.showAndWait();
-            return;
-        }
-
-        try {
-            out.writeUTF("/login " + usernameField.getText());
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-    public void connect() {
-        try {
-            socket = new Socket("localhost", 8189);
-            in = new DataInputStream(socket.getInputStream());
-            out = new DataOutputStream(socket.getOutputStream());
-            Thread t = new Thread(() -> {
-                try {
-                    // Цикл авторизации
-                    while (true) {
-                        String msg = in.readUTF();
-                        if (msg.startsWith("/login_ok ")) {
-                            setUsername(msg.split("\\s")[1]);
-                            break;
-                        }
-                        if (msg.startsWith("/login_failed ")) {
-                            String cause = msg.split("\\s", 2)[1];
-                            msgArea.appendText(cause + "\n");
-                        }
-                    }
-                    // Цикл общения
-                    while (true) {
-                        String msg = in.readUTF();
-                        if (msg.startsWith("/")) {
-                            if (msg.startsWith("/clients_list ")) {
-                                // /clients_list Bob Max Jack
-                                String[] tokens = msg.split("\\s");
-
-                                Platform.runLater(() -> {
-                                    System.out.println(Thread.currentThread().getName());
-                                    clientsList.getItems().clear();
-                                    for (int i = 1; i < tokens.length; i++) {
-                                        clientsList.getItems().add(tokens[i]);
-                                    }
-                                });
-                            }
-                            continue;
-                        }
-                        msgArea.appendText(msg + "\n");
-                    }
-                } catch (IOException e) {
-                    e.printStackTrace();
-                } finally {
-                    disconnect();
-                }
-            });
-            t.start();
-        } catch (IOException e) {
-            Alert alert = new Alert(Alert.AlertType.ERROR, "Невозможно подключиться к серверу", ButtonType.OK);
-            alert.showAndWait();
-        }
+        setAuthorized(false);
+        clientsList = FXCollections.observableArrayList();
+        clientsView.setItems(clientsList);
+        network = new Network();
     }
 
     public void sendMsg() {
-        try {
-            out.writeUTF(msgField.getText());
-            msgField.clear();
-            msgField.requestFocus();
-        } catch (IOException e) {
-            Alert alert = new Alert(Alert.AlertType.ERROR, "Невозможно отправить сообщение", ButtonType.OK);
-            alert.showAndWait();
+        network.sendMessage(msgField.getText());
+        msgField.clear();
+        msgField.requestFocus();
+    }
+
+    public void sendAuth(ActionEvent actionEvent) {
+        if (network.isntConnected()) {
+            network.connect(
+                    argsGetMessage -> {
+                        mainTextArea.appendText((String) argsGetMessage[0]);
+                    },
+                    argsAuthOk -> {
+                        nick = (String) argsAuthOk[0];
+                        setAuthorized(true);
+                    },
+                    argsGetClientsList -> {
+                        Platform.runLater(() -> {
+                            clientsList.clear();
+                            String[] tokens = (String[]) argsGetClientsList;
+                            for (int i = 1; i < tokens.length; i++) {
+                                clientsList.add(tokens[i]);
+                            }
+                        });
+                    },
+                    argsDisconnect -> {
+                        showAlert("Произошло отключение от сервера");
+                        setAuthorized(false);
+                    }
+            );
+        }
+
+        if (network.sendMessage("/auth " + loginField.getText() + " " + passField.getText())) {
+            loginField.clear();
+            passField.clear();
+        } else {
+            showAlert("Невозможно отправить сообщение, проверьте сетевое соединение...");
         }
     }
 
-    private void disconnect() {
-        setUsername(null);
-        try {
-            if (socket != null) {
-                socket.close();
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
+    public void showAlert(String msg) {
+        Platform.runLater(() -> {
+            Alert alert = new Alert(Alert.AlertType.INFORMATION, msg, ButtonType.OK);
+            alert.showAndWait();
+        });
+    }
+
+    public void clickClientsList(MouseEvent mouseEvent) {
+        if (mouseEvent.getClickCount() == 2) {
+            String str = clientsView.getSelectionModel().getSelectedItem();
+            msgField.setText("/@ " + str + " ");
+            msgField.requestFocus();
+            msgField.selectEnd();
         }
     }
 }

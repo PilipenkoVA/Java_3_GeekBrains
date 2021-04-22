@@ -3,76 +3,89 @@ package ru.server;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Vector;
 
 public class Server {
-    private int port;
-    private List<ClientHandler> clients;
+    private ServerSocket serverSocket;
+    private Vector<ClientHandler> clients;
 
-    public Server(int port) {
-        this.port = port;
-        this.clients = new ArrayList<>();
-        try (ServerSocket serverSocket = new ServerSocket(port)) {
-            System.out.println("Сервер запущен на порту " + port);
+    public Server() {
+        try {
+            // 1. запуск БД
+            AutoService.connect();
+            serverSocket = new ServerSocket(8389);
+            clients = new Vector<ClientHandler>();
+            System.out.println("Сервер запущен");
             while (true) {
-                System.out.println("Ждем нового клиента..");
                 Socket socket = serverSocket.accept();
-                System.out.println("Клиент"+socket.getInetAddress()+" подключился");
+                System.out.println("Клиент "+socket.getInetAddress()+" пытается подключится");
                 new ClientHandler(this, socket);
             }
-        } catch (IOException e) {
+        } catch (Exception e) {
             e.printStackTrace();
+        } finally {
+            try {
+                serverSocket.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            // 1. закрытие БД
+           AutoService.disconnect();
         }
     }
 
-    public synchronized void subscribe(ClientHandler clientHandler) {
-        clients.add(clientHandler);
-        broadcastMessage("Клиент " + clientHandler.getUsername() + " вошел в чат");
-        broadcastClientsList();
-    }
-
-    public synchronized void unsubscribe(ClientHandler clientHandler) {
-        clients.remove(clientHandler);
-        broadcastMessage("Клиент " + clientHandler.getUsername() + " вышел из чата");
-        broadcastClientsList();
-    }
-
-    public synchronized void broadcastMessage(String message)  {
-        for (ClientHandler clientHandler : clients) {
-            clientHandler.sendMessage(message);
-        }
-    }
-
-    public synchronized void sendPrivateMessage(ClientHandler sender, String receiverUsername, String message) {
-        for (ClientHandler c : clients) {
-            if (c.getUsername().equals(receiverUsername)) {
-                c.sendMessage(sender.getUsername()+" [Отправил для "+receiverUsername + "] Сообщение: " + message);
-                sender.sendMessage("Пользователю: " + receiverUsername + " Сообщение: " + message);
+    public void sendPrivateMsg(ClientHandler from, String nickname, String msg) {
+        for (ClientHandler o : clients) {
+            if (o.getNick().equals(nickname)) {
+                o.sendMessage(from.getNick()+" [Отправил для "+ nickname + "] Сообщение: " + msg);
+                from.sendMessage("Пользователю: " + nickname + " Сообщение: " + msg);
                 return;
             }
         }
-        sender.sendMessage("Невозможно отправить сообщение пользователю: " + receiverUsername + ". Такого пользователя нет в сети.");
+        from.sendMessage("Клиент " + nickname + " отсутствует");
+    }
+    public void broadcastMsg(ClientHandler client, String msg) {
+        String outMsg = client.getNick() + ": " + msg;
+        for (ClientHandler o : clients) {
+                 // 4. если клиент в "Blacklist" то от его сообщения не получаем
+            if (!o.checkBlackList(client.getNick())) {
+                o.sendMessage(outMsg);
+
+                // 5.записываем все сообщения в БД
+                AutoService.addRecordToDB(client.getNick(),o.getNick(),msg);
+            }
+        }
     }
 
-    public synchronized boolean isUserOnline(String username) {
-        for (ClientHandler clientHandler : clients) {
-            if (clientHandler.getUsername().equals(username)) {
+    public void broadcastClientsList() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("/clientslist ");
+        for (ClientHandler o : clients) {
+            sb.append(o.getNick() + " ");
+        }
+        String out = sb.substring(0, sb.length() - 1);
+        for (ClientHandler o : clients) {
+            o.sendMessage(out);
+        }
+    }
+
+    public void subscribe(ClientHandler clientHandler) {
+        clients.add(clientHandler);
+        broadcastClientsList();
+    }
+
+    public void unsubscribe(ClientHandler clientHandler) {
+        clients.remove(clientHandler);
+        broadcastClientsList();
+    }
+
+    public boolean isNickBusy(String nick) {
+        for (ClientHandler o : clients) {
+            if (o.getNick().equals(nick)) {
                 return true;
             }
         }
         return false;
     }
 
-    public synchronized void broadcastClientsList() {
-        StringBuilder stringBuilder = new StringBuilder("/clients_list ");
-        for (ClientHandler c : clients) {
-            stringBuilder.append(c.getUsername()).append(" ");
-        }
-        stringBuilder.setLength(stringBuilder.length() - 1);
-        String clientsList = stringBuilder.toString();
-        for (ClientHandler clientHandler : clients) {
-            clientHandler.sendMessage(clientsList);
-        }
-    }
 }
