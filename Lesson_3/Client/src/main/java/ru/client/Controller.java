@@ -112,7 +112,7 @@ public class Controller implements Initializable {
     public void clickClientsList(MouseEvent mouseEvent) {
         if (mouseEvent.getClickCount() == 2) {
             String str = clientsView.getSelectionModel().getSelectedItem();
-            msgField.setText("/@ " + str + " ");
+            msgField.setText("/w " + str + " ");
             msgField.requestFocus();
             msgField.selectEnd();
         }

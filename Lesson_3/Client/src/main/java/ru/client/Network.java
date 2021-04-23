@@ -1,4 +1,5 @@
 package ru.client;
+
 import javafx.application.Platform;
 
 import java.io.DataInputStream;
@@ -27,7 +28,7 @@ public class Network {
 
     public void connect(CallbackArgs callMessageToTextArea, CallbackArgs callAuthOk, CallbackArgs callClientsList, CallbackArgs callDisconnect) {
         try {
-            socket = new Socket("localhost", 8389);
+            socket = new Socket("localhost", 8189);
             in = new DataInputStream(socket.getInputStream());
             out = new DataOutputStream(socket.getOutputStream());
 
@@ -36,7 +37,7 @@ public class Network {
                     try {
                         while (true) {
                             String str = in.readUTF();
-                            if (str.startsWith("/auth_OK ")) {
+                            if (str.startsWith("/authok ")) {
                                 callAuthOk.callback(str.split(" ")[1]);
                                 break;
                             }
@@ -86,3 +87,4 @@ public class Network {
         }
     }
 }
+

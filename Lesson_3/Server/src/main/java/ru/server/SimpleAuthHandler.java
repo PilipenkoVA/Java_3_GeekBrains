@@ -55,4 +55,3 @@ public class SimpleAuthHandler implements AuthHandler {
         System.out.println("SimpleAuthHandler stopped...");
     }
 }
-
