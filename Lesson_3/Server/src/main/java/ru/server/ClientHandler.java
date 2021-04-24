@@ -27,7 +27,7 @@ public class ClientHandler {
             this.socket = socket;
             this.in = new DataInputStream(socket.getInputStream());
             this.out = new DataOutputStream(socket.getOutputStream());
-            this.blacklist = AutoService.getBlacklistByNickname(nick);         // 2. добавляем "Blacklist" в конструктор
+            this.blacklist = AutoService.getBlacklistByNickname(nick);
 
             startWorkerThread();
         } catch (IOException e) {
@@ -38,7 +38,6 @@ public class ClientHandler {
     public void startWorkerThread() {
         new Thread(() -> {
             try {
-                // 2. отключение неавторизованных пользователей
                 socket.setSoTimeout(120000);
                 while (true) {
                     String msg = in.readUTF();
@@ -71,12 +70,19 @@ public class ClientHandler {
                         if(msg.startsWith("/end")) {
                             closeConnection();
                         }
-                        // 2. добавляем команду для добаления и удаления в "Blacklist"
+                        if (msg.startsWith("/getBlack")){
+                            sendMessage("Your blacklist: ");
+                            for (int i = 0; i < blacklist.size() ; i++) {
+                                sendMessage(blacklist.get(i));
+                            }
+                        }
                         if (msg.startsWith("/blacklist ")) {
                             String[] token = msg.split(" ");
                             if (AutoService.getBlacklistByNickname(nick).contains(token[1])){
                                 if (AutoService.deleteUserfromBlacklist(nick, token[1]) == 1) {
                                     sendMessage("Вы удалили "+token[1]+" из blacklist");
+                                    blacklist.clear();
+//                                    System.out.println(blacklist);
                                 }else {
                                     sendMessage("Something Wrong! Exsclude");
                                 }
@@ -89,13 +95,11 @@ public class ClientHandler {
                                 }
                             }
                         }
-                        // 5. добавляем команду для распечатки истории переписки
                         if(msg.equals("/getHistory")){
-                            List<String> historyList=AutoService.getHistoryListByNickname(getNick());
+                            List<String> historyList=AutoService.getHistoryListByNickname(nick);
                             sendMessage("----History Loaded----");
                             for (int i = 0; i < historyList.size() ; i++) {
                                 sendMessage(historyList.get(i));
-                                System.out.println(historyList.size());
                             }
                             historyList.clear();
                         }

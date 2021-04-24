@@ -11,7 +11,6 @@ public class Server {
 
     public Server() {
         try {
-            // 1. запуск БД
             AutoService.connect();
             serverSocket = new ServerSocket(8489);
             clients = new Vector<ClientHandler>();
@@ -20,6 +19,8 @@ public class Server {
                 Socket socket = serverSocket.accept();
                 System.out.println("Клиент "+socket.getInetAddress()+" пытается подключится");
                 new ClientHandler(this, socket);
+                System.out.println("Клиент "+socket.getInetAddress()+" подключился");
+                System.out.println("Ожидание нового клиента");
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -29,7 +30,6 @@ public class Server {
             } catch (IOException e) {
                 e.printStackTrace();
             }
-            // 1. закрытие БД
             AutoService.disconnect();
         }
     }
@@ -39,6 +39,7 @@ public class Server {
             if (o.getNick().equals(nickname)) {
                 o.sendMessage(from.getNick()+" [Отправил для "+ nickname + "] Сообщение: " + msg);
                 from.sendMessage("Пользователю: " + nickname + " Сообщение: " + msg);
+                AutoService.addRecordToDB(from.getNick(),nickname,from.getNick() + ": [прислал вам личное сообщение]: " + msg);
                 return;
             }
         }
@@ -47,13 +48,11 @@ public class Server {
     public void broadcastMsg(ClientHandler client, String msg) {
         String outMsg = client.getNick() + ": " + msg;
         for (ClientHandler o : clients) {
-            // 4. если клиент в "Blacklist" то от его сообщения не получаем
             if (!o.checkBlackList(client.getNick())) {
                 o.sendMessage(outMsg);
 
-                // 5.записываем все сообщения в БД
-                AutoService.addRecordToDB(client.getNick(),o.getNick(),msg);
-            }
+
+            } AutoService.addRecordToDB(client.getNick(),o.getNick(),msg);
         }
     }
 
