@@ -7,24 +7,20 @@ import java.util.Vector;
 
 public class Server {
     private ServerSocket serverSocket;
-    private AuthHandler authHandler;
     private Vector<ClientHandler> clients;
-
-    public AuthHandler getAuthHandler() {
-        return authHandler;
-    }
 
     public Server() {
         try {
-            authHandler = new SimpleAuthHandler();
-            authHandler.start();
-            serverSocket = new ServerSocket(8189);
+            AutoService.connect();
+            serverSocket = new ServerSocket(8489);
             clients = new Vector<ClientHandler>();
             System.out.println("Сервер запущен");
             while (true) {
                 Socket socket = serverSocket.accept();
-                System.out.println("Клиент подключился");
+                System.out.println("Клиент "+socket.getInetAddress()+" пытается подключится");
                 new ClientHandler(this, socket);
+                System.out.println("Клиент "+socket.getInetAddress()+" подключился");
+                System.out.println("Ожидание нового клиента");
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -34,25 +30,29 @@ public class Server {
             } catch (IOException e) {
                 e.printStackTrace();
             }
-            authHandler.stop();
+            AutoService.disconnect();
         }
     }
 
-    public void sendPrivateMsg(ClientHandler from, String to, String msg) {
+    public void sendPrivateMsg(ClientHandler from, String nickname, String msg) {
         for (ClientHandler o : clients) {
-            if (o.getNick().equals(to)) {
-                o.sendMessage("from " + from.getNick() + ": " + msg);
-                from.sendMessage("to " + to + ": " + msg);
+            if (o.getNick().equals(nickname)) {
+                o.sendMessage(from.getNick()+" [Отправил для "+ nickname + "] Сообщение: " + msg);
+                from.sendMessage("Пользователю: " + nickname + " Сообщение: " + msg);
+                AutoService.addRecordToDB(from.getNick(),nickname,from.getNick() + ": [прислал вам личное сообщение]: " + msg);
                 return;
             }
         }
-        from.sendMessage("Клиент " + to + " отсутствует");
+        from.sendMessage("Клиент " + nickname + " отсутствует");
     }
-
     public void broadcastMsg(ClientHandler client, String msg) {
         String outMsg = client.getNick() + ": " + msg;
         for (ClientHandler o : clients) {
-            o.sendMessage(outMsg);
+            if (!o.checkBlackList(client.getNick())) {
+                o.sendMessage(outMsg);
+
+
+            } AutoService.addRecordToDB(client.getNick(),o.getNick(),msg);
         }
     }
 
@@ -87,3 +87,4 @@ public class Server {
         return false;
     }
 }
+

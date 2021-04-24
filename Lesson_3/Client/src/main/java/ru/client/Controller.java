@@ -11,6 +11,7 @@ import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.HBox;
 
 import java.net.URL;
+import java.sql.Connection;
 import java.util.ResourceBundle;
 
 public class Controller implements Initializable {
@@ -112,7 +113,7 @@ public class Controller implements Initializable {
     public void clickClientsList(MouseEvent mouseEvent) {
         if (mouseEvent.getClickCount() == 2) {
             String str = clientsView.getSelectionModel().getSelectedItem();
-            msgField.setText("/w " + str + " ");
+            msgField.setText("/@ " + str + " ");
             msgField.requestFocus();
             msgField.selectEnd();
         }

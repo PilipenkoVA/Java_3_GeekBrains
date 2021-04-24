@@ -28,7 +28,7 @@ public class Network {
 
     public void connect(CallbackArgs callMessageToTextArea, CallbackArgs callAuthOk, CallbackArgs callClientsList, CallbackArgs callDisconnect) {
         try {
-            socket = new Socket("localhost", 8189);
+            socket = new Socket("localhost", 8489);
             in = new DataInputStream(socket.getInputStream());
             out = new DataOutputStream(socket.getOutputStream());
 
@@ -37,7 +37,7 @@ public class Network {
                     try {
                         while (true) {
                             String str = in.readUTF();
-                            if (str.startsWith("/authok ")) {
+                            if (str.startsWith("/auth_OK ")) {
                                 callAuthOk.callback(str.split(" ")[1]);
                                 break;
                             }
