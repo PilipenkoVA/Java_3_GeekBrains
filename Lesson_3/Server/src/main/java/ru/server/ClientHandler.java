@@ -1,9 +1,8 @@
 package ru.server;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -14,7 +13,7 @@ public class ClientHandler {
     private DataOutputStream out;
     private String nick;
 
-    List<String> blacklist;                                                                    // 2. создаем "Blacklist"
+    List<String> blacklist;
 
 
     public String getNick() {
@@ -43,7 +42,7 @@ public class ClientHandler {
                     String msg = in.readUTF();
                     if (msg.startsWith("/auth ")) {
                         String[] tokens = msg.split(" ");
-                        // 1. подключение БД
+                        // подключение БД
                         String nick = AutoService.getNicknameByLoginAndPassword(tokens[1],tokens[2]);
                         if (nick != null) {
                             if (server.isNickBusy(nick)) {
@@ -54,6 +53,7 @@ public class ClientHandler {
                             out.writeUTF("/auth_OK " + nick);
                             socket.setSoTimeout(0);
                             server.subscribe(this);
+                            readHistory(100);                                        // <-- вывод сообщений из файла
                             break;
                         } else {
                             out.writeUTF("Неверный логин/пароль");
@@ -82,7 +82,6 @@ public class ClientHandler {
                                 if (AutoService.deleteUserfromBlacklist(nick, token[1]) == 1) {
                                     sendMessage("Вы удалили "+token[1]+" из blacklist");
                                     blacklist.clear();
-//                                    System.out.println(blacklist);
                                 }else {
                                     sendMessage("Something Wrong! Exsclude");
                                 }
@@ -105,6 +104,7 @@ public class ClientHandler {
                         }
                     } else {
                         server.broadcastMsg(this, msg);
+                        writeHistory(msg);                                                // <-- запись сообщений в файл
                     }
                     System.out.println(msg);
                 }
@@ -145,5 +145,40 @@ public class ClientHandler {
 
     public boolean checkBlackList(String nick) {
         return blacklist.contains(nick);
+    }
+    // ПРАКТИЧЕСКОЕ ЗАДАНИЕ №3
+    public void readHistory(int n){                                                // <-- чтение файла истории сообщений
+        File file =new File("test.txt");
+        try{
+            RandomAccessFile raf=new RandomAccessFile(file,"r");
+            long length = file.length()-1;
+            int readLine=0;
+            StringBuilder sb =new StringBuilder();
+            for(long i=length;i >=0; i--){
+                raf.seek(i);
+                char c=(char) raf.read();
+                if(c == '\n'){
+                    readLine++;
+                    if(readLine == n){
+                        break;
+                    }
+                }
+                sb.append(c);
+            }
+            sendMessage(String.valueOf(sb.reverse()));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+    public void writeHistory (String msg){                                       // <-- запись всех строк в файл истории
+        try(FileWriter writer = new FileWriter("test.txt", true))
+        {
+            String text =(nick + ": " + msg + "\n");
+            writer.write(text);
+            writer.flush();
+        }
+        catch(IOException e){
+            e.printStackTrace();
+        }
     }
 }
