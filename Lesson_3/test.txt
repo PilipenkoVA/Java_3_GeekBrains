@@ -1,0 +1,6 @@
+файл
+создан
+and
+проверки
+nick2: Hi nick1
+nick1: hello nick2
