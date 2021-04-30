@@ -4,22 +4,26 @@ import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.Vector;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class Server {
     private ServerSocket serverSocket;
     private Vector<ClientHandler> clients;
+    private ExecutorService service;                                                      // <-- добавил ExecutorService
 
     public Server() {
         try {
             // 1. запуск БД
             AutoService.connect();
+            service = Executors.newFixedThreadPool(1000);                           // <-- добавил 1000 потоков
             serverSocket = new ServerSocket(8689);
             clients = new Vector<ClientHandler>();
             System.out.println("Сервер запущен");
             while (true) {
                 Socket socket = serverSocket.accept();
                 System.out.println("Клиент "+socket.getInetAddress()+" пытается подключится");
-                new ClientHandler(this, socket);
+                new ClientHandler(this, socket, service);                                  // <-- добавил service
                 System.out.println("Клиент "+socket.getInetAddress()+" подключился");
                 System.out.println("Ожидание нового клиента");
             }

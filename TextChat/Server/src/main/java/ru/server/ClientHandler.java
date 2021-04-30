@@ -5,6 +5,7 @@ import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
 
 public class ClientHandler {
     private Server server;
@@ -20,7 +21,7 @@ public class ClientHandler {
         return nick;
     }
 
-    public ClientHandler(Server server, Socket socket) {
+    public ClientHandler(Server server, Socket socket, ExecutorService service) {         // <-- добавил ExecutorService
         try {
             this.server = server;
             this.socket = socket;
@@ -28,14 +29,14 @@ public class ClientHandler {
             this.out = new DataOutputStream(socket.getOutputStream());
             this.blacklist = AutoService.getBlacklistByNickname(nick);
 
-            startWorkerThread();
+            startWorkerThread(service);                                                           // <-- добавил service
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    public void startWorkerThread() {
-        new Thread(() -> {
+    public void startWorkerThread(ExecutorService service) {                              // <-- добавил ExecutorService
+        service.execute(() -> {                                                          // <-- запустил ExecutorService
             try {
                 socket.setSoTimeout(120000);
                 while (true) {
@@ -53,7 +54,7 @@ public class ClientHandler {
                             out.writeUTF("/auth_OK " + nick);
                             socket.setSoTimeout(0);
                             server.subscribe(this);
-                            readHistory(100);                                        // <-- вывод сообщений из файла
+                            readHistory(100);
                             break;
                         } else {
                             out.writeUTF("Неверный логин/пароль");
@@ -104,7 +105,7 @@ public class ClientHandler {
                         }
                     } else {
                         server.broadcastMsg(this, msg);
-                        writeHistory(msg);                                                // <-- запись сообщений в файл
+                        writeHistory(msg);
                     }
                     System.out.println(msg);
                 }
@@ -113,7 +114,7 @@ public class ClientHandler {
             } finally {
                 closeConnection();
             }
-        }).start();
+        });
     }
 
     public void sendMessage(String msg) {
@@ -146,8 +147,7 @@ public class ClientHandler {
     public boolean checkBlackList(String nick) {
         return blacklist.contains(nick);
     }
-    // ПРАКТИЧЕСКОЕ ЗАДАНИЕ №3
-    public void readHistory(int n){                                                // <-- чтение файла истории сообщений
+    public void readHistory(int n){
         File file =new File("test.txt");
         try{
             RandomAccessFile raf=new RandomAccessFile(file,"r");
@@ -170,7 +170,7 @@ public class ClientHandler {
             e.printStackTrace();
         }
     }
-    public void writeHistory (String msg){                                       // <-- запись всех строк в файл истории
+    public void writeHistory (String msg){
         try(FileWriter writer = new FileWriter("test.txt", true))
         {
             String text =(nick + ": " + msg + "\n");
