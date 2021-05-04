@@ -1,2 +1,4 @@
 nick1: ghbdtn
 nick2: hi
+nick2: hi 1
+nick1: hello 2
