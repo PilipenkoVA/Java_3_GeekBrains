@@ -6,8 +6,13 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
+import java.util.logging.ConsoleHandler;
+import java.util.logging.Handler;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class ClientHandler {
+    private static final Logger loger = Logger.getLogger(ClientHandler.class.getName());         // <-- создаем "Logger"
     private Server server;
     private Socket socket;
     private DataInputStream in;
@@ -21,7 +26,7 @@ public class ClientHandler {
         return nick;
     }
 
-    public ClientHandler(Server server, Socket socket, ExecutorService service) {         // <-- добавил ExecutorService
+    public ClientHandler(Server server, Socket socket, ExecutorService service) {
         try {
             this.server = server;
             this.socket = socket;
@@ -29,14 +34,22 @@ public class ClientHandler {
             this.out = new DataOutputStream(socket.getOutputStream());
             this.blacklist = AutoService.getBlacklistByNickname(nick);
 
-            startWorkerThread(service);                                                           // <-- добавил service
+            startWorkerThread(service);
+
+            loger.setLevel(Level.ALL);                                                                  // <-- добавляем
+            Logger.getLogger("").getHandlers()[0].setLevel(Level.ALL);                                  // <-- добавляем
+
+            Handler handler = new ConsoleHandler();                                      // <-- создаем "ConsoleHandler"
+            handler.setLevel(Level.ALL);                                                                // <-- добавляем
+            loger.log(Level.ALL,"Logger to the ClientHandler for new client is running...");  // <-- запись события
+
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    public void startWorkerThread(ExecutorService service) {                              // <-- добавил ExecutorService
-        service.execute(() -> {                                                          // <-- запустил ExecutorService
+    public void startWorkerThread(ExecutorService service) {
+        service.execute(() -> {
             try {
                 socket.setSoTimeout(120000);
                 while (true) {
@@ -69,15 +82,18 @@ public class ClientHandler {
                             server.sendPrivateMsg(this, tokens[1], tokens[2]);
                         }
                         if(msg.startsWith("/end")) {
+                            loger.info("Клиент: " + nick + " прислал команду на выход из чата...");// <-- запись события
                             closeConnection();
                         }
                         if (msg.startsWith("/getBlack")){
+                            loger.info("Клиент: " + nick + " запросил Вlacklist...");         // <-- запись события
                             sendMessage("Your blacklist: ");
                             for (int i = 0; i < blacklist.size() ; i++) {
                                 sendMessage(blacklist.get(i));
                             }
                         }
                         if (msg.startsWith("/blacklist ")) {
+                            loger.info("Клиент: " + nick + " редактирует Вlacklist...");      // <-- запись события
                             String[] token = msg.split(" ");
                             if (AutoService.getBlacklistByNickname(nick).contains(token[1])){
                                 if (AutoService.deleteUserfromBlacklist(nick, token[1]) == 1) {
@@ -85,6 +101,7 @@ public class ClientHandler {
                                     blacklist.clear();
                                 }else {
                                     sendMessage("Something Wrong! Exsclude");
+                                    loger.warning("Something Wrong! Exsclude...");            // <-- запись события
                                 }
                             }else {
                                 if (AutoService.addUserToBlacklist(nick, token[1]) == 1) {
@@ -92,10 +109,12 @@ public class ClientHandler {
                                     sendMessage("Вы добавили "+token[1]+" в blacklist");
                                 } else {
                                     sendMessage("Something Wrong! Add ");
+                                    loger.warning("Something Wrong! Message NOT Add");        // <-- запись события
                                 }
                             }
                         }
                         if(msg.equals("/getHistory")){
+                            loger.info("Клиент: " + nick + " запросил историю сообщений..."); // <-- запись события
                             List<String> historyList=AutoService.getHistoryListByNickname(nick);
                             sendMessage("----History Loaded----");
                             for (int i = 0; i < historyList.size() ; i++) {
@@ -113,6 +132,9 @@ public class ClientHandler {
                 e.printStackTrace();
             } finally {
                 closeConnection();
+                loger.info("Входящий поток клиента: " + nick + " закрыт....");                // <-- запись события
+                loger.info("Исходящий поток от клиента: " + nick + " закрыт....");            // <-- запись события
+                loger.info("Socket клиента: " + nick + " закрыт....");                        // <-- запись события
             }
         });
     }
